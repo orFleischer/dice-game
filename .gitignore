@@ -1,0 +1,7 @@
+.idea/
+intro-to-elm.iml
+elm-stuff/
+src/.DS_Store
+*.js
+node_modules/
+*.iml

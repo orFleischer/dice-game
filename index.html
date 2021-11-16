@@ -1,0 +1,33 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Dice Game With Score Keeping</title>
+    <script type="text/javascript" src="diceGame.js"></script>
+</head>
+
+<body>
+    <div id="diceGame"></div>
+</body>
+
+<script type="text/javascript">
+    // Extract the stored data from previous sessions.
+    var storedData = localStorage.getItem('diceGame-model');
+    var savedScore = storedData ? parseInt(storedData) : null;
+
+    // Load the Elm app, passing in the stored data.
+    var app = Elm.DiceGame.init({
+        node: document.getElementById('diceGame'),
+        flags: savedScore
+    });
+
+    // Listen for commands from the `setStorage` port.
+    // Turn the data to a string and put it in localStorage.
+    app.ports.setStorage.subscribe(function(state) {
+        localStorage.setItem('diceGame-model', state);
+    });
+
+</script>
+
+</html>
