@@ -144,7 +144,7 @@ view model =
                 [ h1 [] [ text (String.fromInt model.dieFace2) ]
                 , svg [] (dice 10 10 50 model.dieFace2)
                 ]
-            , button [ onClick Roll ] [ text "Roll" ]
+            , button [ onClick Roll, disabled model.isRolling ] [ text "Roll" ]
             , h1 [] [ renderWinLoss model ]
             ]
         , div []
