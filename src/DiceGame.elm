@@ -8,6 +8,8 @@ import Random
 import Svg exposing (Svg, circle, rect, svg)
 import Svg.Attributes as Svg exposing (cx, cy, fill, height, r, rx, ry, stroke, strokeWidth, width, x, y)
 import Time
+import Json.Decode as Decode
+import Json.Encode as Encode
 
 
 -- MAIN
@@ -37,7 +39,13 @@ type alias Model =
     , isRolling : Bool
     , hasWon : Bool
     , score : Int
+    , hiScores : List HiScore
     }
+
+type alias HiScore =
+     { score : Int
+     , name : String
+     }
 
 
 {-init : () -> ( Model, Cmd Msg )
@@ -47,14 +55,20 @@ init _ =
     )-}
 
 
-init : Maybe Int -> ( Model, Cmd Msg )
+init : Encode.Value -> ( Model, Cmd Msg )
 init possibleSavedScore =
     let
         _ = Debug.log "saved score is " possibleSavedScore
     in
-    ( Model 1 1 0 False False (Maybe.withDefault 0 possibleSavedScore)
+    case Decode.decodeValue hiScoresDecoder possibleSavedScore of
+        Ok hiScores ->
+            ( Model 1 1 0 False False 0 hiScores, Cmd.none)
+        Err _ ->
+            ( Model 1 1 0 False False 0 [], Cmd.none)
+
+{-    ( Model 1 1 0 False False (Maybe.withDefault 0 possibleSavedScore)
     , Cmd.none
-    )
+    )-}
 
 
 
@@ -83,7 +97,7 @@ update msg model =
             )
 
         NewFace newFace1 newFace2 ->
-            ( Model newFace1 newFace2 model.numOfRolls model.isRolling model.hasWon model.score
+            ( Model newFace1 newFace2 model.numOfRolls model.isRolling model.hasWon model.score model.hiScores
             , Cmd.none
             )
 
@@ -149,8 +163,19 @@ view model =
             ]
         , div []
             [ h1 [] [ text ("Your Score is " ++ (String.fromInt model.score)) ]
+            , h1 [] [text "High Scores"]
+            , ol [] (renderHiScores model.hiScores)
+
             ]
+
         ]
+
+renderHiScores: List HiScore -> List (Html msg)
+renderHiScores hiScores =
+    hiScores
+        |> List.map (\{score, name} -> name ++ "   " ++ String.fromInt score)
+        |> List.map (\scoreStr -> li [] [text scoreStr])
+
 
 
 renderWinLoss : Model -> Html msg
@@ -330,3 +355,9 @@ diceDot radius centerX centerY =
         , Svg.stroke "black"
         ]
         []
+
+hiScoresDecoder: Decode.Decoder (List HiScore)
+hiScoresDecoder = Decode.field "hi_scores" (Decode.list hiScoreDecoder)
+
+hiScoreDecoder: Decode.Decoder HiScore
+hiScoreDecoder = Decode.map2 HiScore (Decode.field "score" Decode.int) (Decode.field "name" Decode.string)

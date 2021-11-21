@@ -13,13 +13,13 @@
 
 <script type="text/javascript">
     // Extract the stored data from previous sessions.
-    var storedData = localStorage.getItem('diceGame-model');
-    var savedScore = storedData ? parseInt(storedData) : null;
+    var storedData = localStorage.getItem(`diceGame-model`);
+    var hiScores = storedData ? JSON.parse(storedData) : null;
 
     // Load the Elm app, passing in the stored data.
     var app = Elm.DiceGame.init({
         node: document.getElementById('diceGame'),
-        flags: savedScore
+        flags: hiScores
     });
 
     // Listen for commands from the `setStorage` port.
