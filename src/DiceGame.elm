@@ -4,12 +4,13 @@ import Browser
 import Html exposing (..)
 import Html.Attributes exposing (disabled, style)
 import Html.Events exposing (..)
+import Json.Decode as Decode
+import Json.Encode as Encode
 import Random
 import Svg exposing (Svg, circle, rect, svg)
 import Svg.Attributes as Svg exposing (cx, cy, fill, height, r, rx, ry, stroke, strokeWidth, width, x, y)
 import Time
-import Json.Decode as Decode
-import Json.Encode as Encode
+
 
 
 -- MAIN
@@ -24,17 +25,16 @@ main =
         }
 
 
+-- MODEL
+
 diceColors =
     { red = "#EB1124", white = "white" }
 
-
-
--- MODEL
-
+animationFrameDelay = 100
 
 type alias Model =
-    { dieFace1 : Int
-    , dieFace2 : Int
+    { dieFace1 : DiceFace
+    , dieFace2 : DiceFace
     , numOfRolls : Int
     , isRolling : Bool
     , hasWon : Bool
@@ -42,53 +42,68 @@ type alias Model =
     , hiScores : List HiScore
     }
 
+
 type alias HiScore =
-     { score : Int
-     , name : String
-     }
+    { score : Int
+    , name : String
+    }
 
 
-{-init : () -> ( Model, Cmd Msg )
-init _ =
-    ( Model 1 1 0 False False 0
-    , Cmd.none
-    )-}
-
-
-init : Encode.Value -> ( Model, Cmd Msg )
-init possibleSavedScore =
-    let
-        _ = Debug.log "saved score is " possibleSavedScore
-    in
-    case Decode.decodeValue hiScoresDecoder possibleSavedScore of
-        Ok hiScores ->
-            ( Model 1 1 0 False False 0 hiScores, Cmd.none)
-        Err _ ->
-            ( Model 1 1 0 False False 0 [], Cmd.none)
-
-{-    ( Model 1 1 0 False False (Maybe.withDefault 0 possibleSavedScore)
-    , Cmd.none
-    )-}
-
-
-
--- UPDATE
+type DiceFace
+    = One
+    | Two
+    | Three
+    | Four
+    | Five
+    | Six
 
 
 type Msg
     = Roll
     | ContinueRoll
-    | NewFace Int Int
+    | NewFace DiceFace DiceFace
+
+
+
+{- init : () -> ( Model, Cmd Msg )
+   init _ =
+       ( Model 1 1 0 False False 0
+       , Cmd.none
+       )
+-}
+
+
+init : Encode.Value -> ( Model, Cmd Msg )
+init possibleSavedScore =
+    let
+        _ =
+            Debug.log "saved score is " possibleSavedScore
+    in
+    case Decode.decodeValue hiScoresDecoder possibleSavedScore of
+        Ok hiScores ->
+            ( Model One One 0 False False 0 hiScores, Cmd.none )
+
+        Err _ ->
+            ( Model One One 0 False False 0 [], Cmd.none )
+
+
+
+{- ( Model 1 1 0 False False (Maybe.withDefault 0 possibleSavedScore)
+   , Cmd.none
+   )
+-}
+-- UPDATE
 
 
 port setStorage : Int -> Cmd msg
+
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     let
         dices : Random.Generator Msg
         dices =
-            Random.map2 (\dice1 dice2 -> NewFace dice1 dice2) (Random.int 1 6) (Random.int 1 6)
+            Random.map2 (\dice1 dice2 -> NewFace dice1 dice2) (Random.uniform One [Two, Three, Four, Five, Six]) (Random.uniform One [Two, Three, Four, Five, Six])
     in
     case msg of
         Roll ->
@@ -125,7 +140,8 @@ update msg model =
                         Debug.log "score is " score
                 in
                 ( { model | numOfRolls = 0, isRolling = False, hasWon = hasWon, score = score }
-                , Cmd.batch [setStorage score]--Cmd.none
+                , Cmd.batch [ setStorage score ]
+                  --Cmd.none
                 )
 
 
@@ -136,7 +152,7 @@ update msg model =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     if model.isRolling then
-        Time.every 100 (\_ -> ContinueRoll)
+        Time.every animationFrameDelay (\_ -> ContinueRoll)
 
     else
         Sub.none
@@ -151,31 +167,29 @@ view model =
     div []
         [ div [ style "float" "left" ]
             [ div []
-                [ h1 [] [ text (String.fromInt model.dieFace1) ]
+                [ h1 [] [ text (String.fromInt (faceValue model.dieFace1)) ]
                 , svg [] (dice 10 10 50 model.dieFace1)
                 ]
             , div []
-                [ h1 [] [ text (String.fromInt model.dieFace2) ]
+                [ h1 [] [ text (String.fromInt (faceValue model.dieFace2)) ]
                 , svg [] (dice 10 10 50 model.dieFace2)
                 ]
             , button [ onClick Roll, disabled model.isRolling ] [ text "Roll" ]
             , h1 [] [ renderWinLoss model ]
             ]
         , div []
-            [ h1 [] [ text ("Your Score is " ++ (String.fromInt model.score)) ]
-            , h1 [] [text "High Scores"]
+            [ h1 [] [ text ("Your Score is " ++ String.fromInt model.score) ]
+            , h1 [] [ text "High Scores" ]
             , ol [] (renderHiScores model.hiScores)
-
             ]
-
         ]
 
-renderHiScores: List HiScore -> List (Html msg)
+
+renderHiScores : List HiScore -> List (Html msg)
 renderHiScores hiScores =
     hiScores
-        |> List.map (\{score, name} -> name ++ "   " ++ String.fromInt score)
-        |> List.map (\scoreStr -> li [] [text scoreStr])
-
+        |> List.map (\{ score, name } -> name ++ "   " ++ String.fromInt score)
+        |> List.map (\scoreStr -> li [] [ text scoreStr ])
 
 
 renderWinLoss : Model -> Html msg
@@ -191,7 +205,7 @@ renderWinLoss model =
         text " rolling"
 
 
-dice : Float -> Float -> Float -> Int -> List (Svg msg)
+dice : Float -> Float -> Float -> DiceFace -> List (Svg msg)
 dice upperLeftX upperLeftY edgeLength diceFace =
     let
         edgeLengthStr =
@@ -214,28 +228,25 @@ dice upperLeftX upperLeftY edgeLength diceFace =
     rectSvg :: diceDots upperLeftX upperLeftY edgeLength diceFace
 
 
-diceDots : Float -> Float -> Float -> Int -> List (Svg msg)
+diceDots : Float -> Float -> Float -> DiceFace -> List (Svg msg)
 diceDots x y edgeLength diceFace =
     case diceFace of
-        1 ->
+        One ->
             List.map (\f -> f x y edgeLength) [ diceDotCenter ]
 
-        2 ->
+        Two ->
             List.map (\f -> f x y edgeLength) [ diceDotLowerLeft, diceDotUpperRight ]
 
-        3 ->
+        Three ->
             List.map (\f -> f x y edgeLength) [ diceDotLowerLeft, diceDotUpperRight, diceDotCenter ]
 
-        4 ->
+        Four ->
             List.map (\f -> f x y edgeLength) [ diceDotLowerLeft, diceDotLowerRight, diceDotUpperLeft, diceDotUpperRight ]
 
-        5 ->
+        Five ->
             List.map (\f -> f x y edgeLength) [ diceDotLowerLeft, diceDotLowerRight, diceDotUpperLeft, diceDotUpperRight, diceDotCenter ]
 
-        6 ->
-            List.map (\f -> f x y edgeLength) [ diceDotLowerLeft, diceDotLowerRight, diceDotUpperLeft, diceDotUpperRight, diceDotMiddleLeft, diceDotMiddleRight ]
-
-        _ ->
+        Six ->
             List.map (\f -> f x y edgeLength) [ diceDotLowerLeft, diceDotLowerRight, diceDotUpperLeft, diceDotUpperRight, diceDotMiddleLeft, diceDotMiddleRight ]
 
 
@@ -356,8 +367,37 @@ diceDot radius centerX centerY =
         ]
         []
 
-hiScoresDecoder: Decode.Decoder (List HiScore)
-hiScoresDecoder = Decode.field "hi_scores" (Decode.list hiScoreDecoder)
 
-hiScoreDecoder: Decode.Decoder HiScore
-hiScoreDecoder = Decode.map2 HiScore (Decode.field "score" Decode.int) (Decode.field "name" Decode.string)
+hiScoresDecoder : Decode.Decoder (List HiScore)
+hiScoresDecoder =
+    Decode.field "hi_scores" (Decode.list hiScoreDecoder)
+
+
+hiScoreDecoder : Decode.Decoder HiScore
+hiScoreDecoder =
+    Decode.map2 HiScore (Decode.field "score" Decode.int) (Decode.field "name" Decode.string)
+
+
+faceScore : DiceFace -> Int
+faceScore diceFace = faceValue diceFace
+
+faceValue : DiceFace -> Int
+faceValue diceFace =
+    case diceFace of
+        One ->
+            1
+
+        Two ->
+            2
+
+        Three ->
+            3
+
+        Four ->
+            4
+
+        Five ->
+            5
+
+        Six ->
+            6
