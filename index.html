@@ -25,7 +25,7 @@
     // Listen for commands from the `setStorage` port.
     // Turn the data to a string and put it in localStorage.
     app.ports.setStorage.subscribe(function(state) {
-        localStorage.setItem('diceGame-model', state);
+        localStorage.setItem('diceGame-model', JSON.stringify(state));
     });
 
 </script>

@@ -25,12 +25,17 @@ main =
         }
 
 
+
 -- MODEL
+
 
 diceColors =
     { red = "#EB1124", white = "white" }
 
-animationFrameDelay = 100
+
+animationFrameDelay =
+    100
+
 
 type alias Model =
     { dieFace1 : DiceFace
@@ -92,10 +97,15 @@ init possibleSavedScore =
    , Cmd.none
    )
 -}
+
+
+-- PORTs
+
+port setStorage : Encode.Value -> Cmd msg
+
+
+
 -- UPDATE
-
-
-port setStorage : Int -> Cmd msg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -103,7 +113,7 @@ update msg model =
     let
         dices : Random.Generator Msg
         dices =
-            Random.map2 (\dice1 dice2 -> NewFace dice1 dice2) (Random.uniform One [Two, Three, Four, Five, Six]) (Random.uniform One [Two, Three, Four, Five, Six])
+            Random.map2 (\dice1 dice2 -> NewFace dice1 dice2) (Random.uniform One [ Two, Three, Four, Five, Six ]) (Random.uniform One [ Two, Three, Four, Five, Six ])
     in
     case msg of
         Roll ->
@@ -128,9 +138,8 @@ update msg model =
                         model.dieFace2 == model.dieFace1
 
                     score =
-                        model.score
-                            + (if hasWon then
-                                1
+                          (if hasWon then
+                                faceScore model.dieFace1
 
                                else
                                 0
@@ -138,9 +147,31 @@ update msg model =
 
                     _ =
                         Debug.log "score is " score
+
+
+                    newHiScore = HiScore score "hatul"
+
+                    newHiScores : List HiScore
+                    newHiScores = (newHiScore :: model.hiScores)
+                         |> List.sortBy .score
+                         |> List.reverse
+                         |> List.take 2
+
+
+                    _ = Debug.log "encoded stuff" newHiScores
+
+                    newEncodedHiScores : Encode.Value
+                    newEncodedHiScores = Encode.list encodeHiScore newHiScores
+
+
+{-
+                    newHiScore : Encode.Value
+                    newHiScore = encodeHiScore <| HiScore score "hatul"-}
+
+
                 in
-                ( { model | numOfRolls = 0, isRolling = False, hasWon = hasWon, score = score }
-                , Cmd.batch [ setStorage score ]
+                ( { model | numOfRolls = 0, isRolling = False, hasWon = hasWon, score = score, hiScores = newHiScores }
+                , Cmd.batch [ setStorage newEncodedHiScores]
                   --Cmd.none
                 )
 
@@ -177,19 +208,26 @@ view model =
             , button [ onClick Roll, disabled model.isRolling ] [ text "Roll" ]
             , h1 [] [ renderWinLoss model ]
             ]
-        , div []
-            [ h1 [] [ text ("Your Score is " ++ String.fromInt model.score) ]
-            , h1 [] [ text "High Scores" ]
-            , ol [] (renderHiScores model.hiScores)
-            ]
+        , div [] (h1 [] [ text ("Your Score is " ++ String.fromInt model.score) ] :: renderHiScores model.hiScores)
         ]
 
 
 renderHiScores : List HiScore -> List (Html msg)
 renderHiScores hiScores =
-    hiScores
-        |> List.map (\{ score, name } -> name ++ "   " ++ String.fromInt score)
-        |> List.map (\scoreStr -> li [] [ text scoreStr ])
+    case hiScores of
+        [] ->
+            []
+
+        nonEmptyHiScores ->
+            let
+                renderedHiScores =
+                    nonEmptyHiScores
+                        |> List.map (\{ score, name } -> name ++ "   " ++ String.fromInt score)
+                        |> List.map (\scoreStr -> li [] [ text scoreStr ])
+            in
+            [ h1 [] [ text "High Scores" ]
+            , ol [] renderedHiScores
+            ]
 
 
 renderWinLoss : Model -> Html msg
@@ -378,8 +416,15 @@ hiScoreDecoder =
     Decode.map2 HiScore (Decode.field "score" Decode.int) (Decode.field "name" Decode.string)
 
 
+encodeHiScore : HiScore -> Encode.Value
+encodeHiScore hiScore =
+    (Encode.object [ ("score", Encode.int hiScore.score), ("name", Encode.string hiScore.name)])
+
+
 faceScore : DiceFace -> Int
-faceScore diceFace = faceValue diceFace
+faceScore diceFace =
+    faceValue diceFace
+
 
 faceValue : DiceFace -> Int
 faceValue diceFace =
