@@ -36,6 +36,8 @@ diceColors =
 animationFrameDelay =
     100
 
+throwsPerGame = 5
+
 
 type alias Model =
     { dieFace1 : DiceFace
@@ -43,6 +45,7 @@ type alias Model =
     , numOfRolls : Int
     , isRolling : Bool
     , hasWon : Bool
+    , throwsLeft : Int
     , score : Int
     , hiScores : List HiScore
     }
@@ -66,6 +69,8 @@ type DiceFace
 type Msg
     = Roll
     | ContinueRoll
+    | PromptUser
+    | GotUserName (Maybe String)
     | NewFace DiceFace DiceFace
 
 
@@ -86,10 +91,10 @@ init possibleSavedScore =
     in
     case Decode.decodeValue hiScoresDecoder possibleSavedScore of
         Ok hiScores ->
-            ( Model One One 0 False False 0 hiScores, Cmd.none )
+            ( Model One One 0 False False throwsPerGame 0 hiScores, Cmd.none )
 
         Err _ ->
-            ( Model One One 0 False False 0 [], Cmd.none )
+            ( Model One One 0 False False throwsPerGame 0 [], Cmd.none )
 
 
 
@@ -103,6 +108,9 @@ init possibleSavedScore =
 
 port setStorage : Encode.Value -> Cmd msg
 
+port promptUser : String -> Cmd msg
+
+port getUserName : (Maybe String -> msg) -> Sub msg
 
 
 -- UPDATE
@@ -122,12 +130,40 @@ update msg model =
             )
 
         NewFace newFace1 newFace2 ->
-            ( Model newFace1 newFace2 model.numOfRolls model.isRolling model.hasWon model.score model.hiScores
+            ( Model newFace1 newFace2 model.numOfRolls model.isRolling model.hasWon model.throwsLeft model.score model.hiScores
             , Cmd.none
             )
 
+        PromptUser ->
+            (model, promptUser "Initials")
+
+        GotUserName maybeName ->
+            let
+                effectiveName = Maybe.withDefault "hatul" maybeName
+                newHiScore = HiScore model.score effectiveName
+
+                newHiScores : List HiScore
+                newHiScores = (newHiScore :: model.hiScores)
+                     |> List.sortBy .score
+                     |> List.reverse
+                     |> List.take 2
+
+                _ = Debug.log "encoded stuff" newHiScores
+
+                newEncodedHiScores : Encode.Value
+                newEncodedHiScores = Encode.list encodeHiScore newHiScores
+
+
+                {-
+                                    newHiScore : Encode.Value
+                                    newHiScore = encodeHiScore <| HiScore score "hatul"-}
+                newModel = Model One One 0 False False throwsPerGame 0 newHiScores
+            in
+                (newModel, setStorage newEncodedHiScores)
+
+
         ContinueRoll ->
-            if model.numOfRolls <= 10 then
+            if model.numOfRolls <= 5 then
                 ( { model | numOfRolls = model.numOfRolls + 1 }
                 , Random.generate identity dices
                 )
@@ -137,8 +173,8 @@ update msg model =
                     hasWon =
                         model.dieFace2 == model.dieFace1
 
-                    score =
-                          (if hasWon then
+                    newScore =
+                          model.score + (if hasWon then
                                 faceScore model.dieFace1
 
                                else
@@ -146,10 +182,14 @@ update msg model =
                               )
 
                     _ =
-                        Debug.log "score is " score
+                        Debug.log "score is " newScore
+                    _ = Debug.log "game " model.throwsLeft
+
+                    newModel : Model
+                    newModel = { model | numOfRolls = 0, isRolling = False, hasWon = hasWon, score = newScore, throwsLeft = model.throwsLeft - 1}
 
 
-                    newHiScore = HiScore score "hatul"
+{-                    newHiScore = HiScore score "hatul"
 
                     newHiScores : List HiScore
                     newHiScores = (newHiScore :: model.hiScores)
@@ -161,7 +201,7 @@ update msg model =
                     _ = Debug.log "encoded stuff" newHiScores
 
                     newEncodedHiScores : Encode.Value
-                    newEncodedHiScores = Encode.list encodeHiScore newHiScores
+                    newEncodedHiScores = Encode.list encodeHiScore newHiScores-}
 
 
 {-
@@ -170,10 +210,20 @@ update msg model =
 
 
                 in
-                ( { model | numOfRolls = 0, isRolling = False, hasWon = hasWon, score = score, hiScores = newHiScores }
+{-                ( { model | numOfRolls = 0, isRolling = False, hasWon = hasWon, score = score, hiScores = newHiScores, throwsLeft = model.throwsLeft - 1}
                 , Cmd.batch [ setStorage newEncodedHiScores]
                   --Cmd.none
-                )
+                )-}
+
+                if (newModel.throwsLeft <= 0) then
+                    update PromptUser newModel
+                else
+                    (newModel, Cmd.none)
+
+{-                ( { model | numOfRolls = 0, isRolling = False, hasWon = hasWon, score = score, throwsLeft = model.throwsLeft - 1}, Cmd.none
+
+                                  --Cmd.none
+                                )-}
 
 
 
@@ -183,10 +233,9 @@ update msg model =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     if model.isRolling then
-        Time.every animationFrameDelay (\_ -> ContinueRoll)
-
+       Sub.batch [getUserName GotUserName,  Time.every animationFrameDelay (\_ -> ContinueRoll)]
     else
-        Sub.none
+       Sub.batch [getUserName GotUserName]
 
 
 

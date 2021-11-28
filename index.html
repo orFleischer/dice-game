@@ -28,6 +28,11 @@
         localStorage.setItem('diceGame-model', JSON.stringify(state));
     });
 
+    app.ports.promptUser.subscribe(function(message) {
+        var response = window.prompt(message);
+        app.ports.getUserName.send(response);
+    });
+
 </script>
 
 </html>
