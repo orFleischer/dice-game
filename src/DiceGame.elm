@@ -29,14 +29,12 @@ main =
 -- MODEL
 
 
-diceColors =
-    { red = "#EB1124", white = "white" }
-
-
-animationFrameDelay =
-    100
-
-throwsPerGame = 5
+configs =
+    { diceColors = { red = "#EB1124", white = "white" }
+    , animationFrameDelay = 100
+    , throwsPerGame = 5
+    , diceRollsPerGame = 10
+    }
 
 
 type alias Model =
@@ -74,43 +72,28 @@ type Msg
     | NewFace DiceFace DiceFace
 
 
-
-{- init : () -> ( Model, Cmd Msg )
-   init _ =
-       ( Model 1 1 0 False False 0
-       , Cmd.none
-       )
--}
-
-
 init : Encode.Value -> ( Model, Cmd Msg )
 init possibleSavedScore =
-    let
-        _ =
-            Debug.log "saved score is " possibleSavedScore
-    in
     case Decode.decodeValue hiScoresDecoder possibleSavedScore of
         Ok hiScores ->
-            ( Model One One 0 False False throwsPerGame 0 hiScores, Cmd.none )
+            ( Model One One 0 False False configs.throwsPerGame 0 hiScores, Cmd.none )
 
         Err _ ->
-            ( Model One One 0 False False throwsPerGame 0 [], Cmd.none )
+            ( Model One One 0 False False configs.throwsPerGame 0 [], Cmd.none )
 
-
-
-{- ( Model 1 1 0 False False (Maybe.withDefault 0 possibleSavedScore)
-   , Cmd.none
-   )
--}
 
 
 -- PORTs
 
+
 port setStorage : Encode.Value -> Cmd msg
+
 
 port promptUser : String -> Cmd msg
 
+
 port getUserName : (Maybe String -> msg) -> Sub msg
+
 
 
 -- UPDATE
@@ -135,35 +118,33 @@ update msg model =
             )
 
         PromptUser ->
-            (model, promptUser "Initials")
+            ( model, promptUser "Enter you initials" )
 
         GotUserName maybeName ->
             let
-                effectiveName = Maybe.withDefault "hatul" maybeName
-                newHiScore = HiScore model.score effectiveName
+                effectiveName =
+                    Maybe.withDefault "hatul" maybeName
+
+                newHiScore =
+                    HiScore model.score effectiveName
 
                 newHiScores : List HiScore
-                newHiScores = (newHiScore :: model.hiScores)
-                     |> List.sortBy .score
-                     |> List.reverse
-                     |> List.take 2
+                newHiScores =
+                    (newHiScore :: model.hiScores)
+                        |> List.sortBy .score
+                        |> List.reverse
+                        |> List.take 2
 
-                _ = Debug.log "encoded stuff" newHiScores
+                _ =
+                    Debug.log "encoded stuff" newHiScores
 
-                newEncodedHiScores : Encode.Value
-                newEncodedHiScores = Encode.list encodeHiScore newHiScores
-
-
-                {-
-                                    newHiScore : Encode.Value
-                                    newHiScore = encodeHiScore <| HiScore score "hatul"-}
-                newModel = Model One One 0 False False throwsPerGame 0 newHiScores
+                newModel =
+                    Model One One 0 False False configs.throwsPerGame 0 newHiScores
             in
-                (newModel, setStorage newEncodedHiScores)
-
+            ( newModel, setStorage <| encodeHiScores newHiScores )
 
         ContinueRoll ->
-            if model.numOfRolls <= 5 then
+            if model.numOfRolls <= configs.diceRollsPerGame then
                 ( { model | numOfRolls = model.numOfRolls + 1 }
                 , Random.generate identity dices
                 )
@@ -174,56 +155,23 @@ update msg model =
                         model.dieFace2 == model.dieFace1
 
                     newScore =
-                          model.score + (if hasWon then
+                        model.score
+                            + (if hasWon then
                                 faceScore model.dieFace1
 
                                else
                                 0
                               )
 
-                    _ =
-                        Debug.log "score is " newScore
-                    _ = Debug.log "game " model.throwsLeft
-
                     newModel : Model
-                    newModel = { model | numOfRolls = 0, isRolling = False, hasWon = hasWon, score = newScore, throwsLeft = model.throwsLeft - 1}
-
-
-{-                    newHiScore = HiScore score "hatul"
-
-                    newHiScores : List HiScore
-                    newHiScores = (newHiScore :: model.hiScores)
-                         |> List.sortBy .score
-                         |> List.reverse
-                         |> List.take 2
-
-
-                    _ = Debug.log "encoded stuff" newHiScores
-
-                    newEncodedHiScores : Encode.Value
-                    newEncodedHiScores = Encode.list encodeHiScore newHiScores-}
-
-
-{-
-                    newHiScore : Encode.Value
-                    newHiScore = encodeHiScore <| HiScore score "hatul"-}
-
-
+                    newModel =
+                        { model | numOfRolls = 0, isRolling = False, hasWon = hasWon, score = newScore, throwsLeft = model.throwsLeft - 1 }
                 in
-{-                ( { model | numOfRolls = 0, isRolling = False, hasWon = hasWon, score = score, hiScores = newHiScores, throwsLeft = model.throwsLeft - 1}
-                , Cmd.batch [ setStorage newEncodedHiScores]
-                  --Cmd.none
-                )-}
-
-                if (newModel.throwsLeft <= 0) then
+                if newModel.throwsLeft <= 0 then
                     update PromptUser newModel
+
                 else
-                    (newModel, Cmd.none)
-
-{-                ( { model | numOfRolls = 0, isRolling = False, hasWon = hasWon, score = score, throwsLeft = model.throwsLeft - 1}, Cmd.none
-
-                                  --Cmd.none
-                                )-}
+                    ( newModel, Cmd.none )
 
 
 
@@ -233,9 +181,10 @@ update msg model =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     if model.isRolling then
-       Sub.batch [getUserName GotUserName,  Time.every animationFrameDelay (\_ -> ContinueRoll)]
+        Sub.batch [ getUserName GotUserName, Time.every configs.animationFrameDelay (\_ -> ContinueRoll) ]
+
     else
-       Sub.batch [getUserName GotUserName]
+        Sub.batch [ getUserName GotUserName ]
 
 
 
@@ -302,11 +251,11 @@ dice upperLeftX upperLeftY edgeLength diceFace =
             rect
                 [ width edgeLengthStr
                 , height edgeLengthStr
-                , upperLeftX |> String.fromFloat |> x
-                , upperLeftY |> String.fromFloat |> y
+                , x <| String.fromFloat upperLeftX
+                , y <| String.fromFloat upperLeftY
                 , rx "2"
                 , ry "2"
-                , fill diceColors.red
+                , fill configs.diceColors.red
                 , stroke "black"
                 , strokeWidth "2"
                 ]
@@ -317,24 +266,27 @@ dice upperLeftX upperLeftY edgeLength diceFace =
 
 diceDots : Float -> Float -> Float -> DiceFace -> List (Svg msg)
 diceDots x y edgeLength diceFace =
+    let
+        diceRenderer = \f -> f x y edgeLength
+    in
     case diceFace of
         One ->
-            List.map (\f -> f x y edgeLength) [ diceDotCenter ]
+            List.map diceRenderer [ diceDotCenter ]
 
         Two ->
-            List.map (\f -> f x y edgeLength) [ diceDotLowerLeft, diceDotUpperRight ]
+            List.map diceRenderer [ diceDotLowerLeft, diceDotUpperRight ]
 
         Three ->
-            List.map (\f -> f x y edgeLength) [ diceDotLowerLeft, diceDotUpperRight, diceDotCenter ]
+            List.map diceRenderer [ diceDotLowerLeft, diceDotUpperRight, diceDotCenter ]
 
         Four ->
-            List.map (\f -> f x y edgeLength) [ diceDotLowerLeft, diceDotLowerRight, diceDotUpperLeft, diceDotUpperRight ]
+            List.map diceRenderer [ diceDotLowerLeft, diceDotLowerRight, diceDotUpperLeft, diceDotUpperRight ]
 
         Five ->
-            List.map (\f -> f x y edgeLength) [ diceDotLowerLeft, diceDotLowerRight, diceDotUpperLeft, diceDotUpperRight, diceDotCenter ]
+            List.map diceRenderer [ diceDotLowerLeft, diceDotLowerRight, diceDotUpperLeft, diceDotUpperRight, diceDotCenter ]
 
         Six ->
-            List.map (\f -> f x y edgeLength) [ diceDotLowerLeft, diceDotLowerRight, diceDotUpperLeft, diceDotUpperRight, diceDotMiddleLeft, diceDotMiddleRight ]
+            List.map diceRenderer [ diceDotLowerLeft, diceDotLowerRight, diceDotUpperLeft, diceDotUpperRight, diceDotMiddleLeft, diceDotMiddleRight ]
 
 
 diceDotUpperLeft : Float -> Float -> Float -> Svg msg
@@ -445,15 +397,16 @@ diceDotMiddleRight diceX diceY diceEdgeLength =
 diceDot : Float -> Float -> Float -> Svg msg
 diceDot radius centerX centerY =
     circle
-        [ radius |> String.fromFloat |> r
-        , centerX |> String.fromFloat |> cx
-        , centerY |> String.fromFloat |> cy
-        , fill diceColors.white
+        [ r <| String.fromFloat radius
+        , cx <| String.fromFloat centerX
+        , cy <| String.fromFloat centerY
+        , fill configs.diceColors.white
         , Svg.strokeWidth "0.5"
         , Svg.stroke "black"
         ]
         []
 
+-- Encoders/Decoders
 
 hiScoresDecoder : Decode.Decoder (List HiScore)
 hiScoresDecoder =
@@ -465,9 +418,14 @@ hiScoreDecoder =
     Decode.map2 HiScore (Decode.field "score" Decode.int) (Decode.field "name" Decode.string)
 
 
+encodeHiScores : List HiScore -> Encode.Value
+encodeHiScores hiScores =
+    Encode.object [ ( "hi_scores", Encode.list encodeHiScore hiScores ) ]
+
+
 encodeHiScore : HiScore -> Encode.Value
 encodeHiScore hiScore =
-    (Encode.object [ ("score", Encode.int hiScore.score), ("name", Encode.string hiScore.name)])
+    Encode.object [ ( "score", Encode.int hiScore.score ), ( "name", Encode.string hiScore.name ) ]
 
 
 faceScore : DiceFace -> Int
