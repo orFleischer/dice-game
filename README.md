@@ -9,3 +9,8 @@
    This will install `elm-live` locally on your project. You will see a new folder called`node-modules`
    2. Run `elm-live` from `node_modules` folder using  
       `./node_modules/elm-live/bin/elm-live.js src/DiceGame.elm -- --output=diceGame.js`
+      
+3. Adding unit tests
+   1. `npm install elm-test@0.19.1`
+   2. `./node_modules/elm-test/bin/elm-test init`
+   3. `./node_modules/elm-test/bin/elm-test` will execute the tests
