@@ -1,0 +1,45 @@
+.roll-button {
+    display: block;
+    width: 200px;
+    height: 60px;
+    position: relative;
+    font-family: arial;
+    font-size:30px;
+}
+
+.roll-button div {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  line-height: 60px;
+  text-align: center;
+  transform-origin: 50% 50% -30px;
+  transition: all .2s ease;
+  backface-visibility: hidden;
+}
+
+button {
+    background: transparent;
+    border: none;
+    font-size:0;
+}
+
+.roll-button :nth-child(1) {
+  color: white;
+  background-color: #EB1124;
+  transform: rotateX(90deg);
+}
+
+.roll-button :nth-child(2) {
+  background-color: #f5f5f5;
+  color: black;
+  transform: rotateX(0deg);
+}
+
+.roll-button:hover :nth-child(1) {
+  transform: rotateX(0deg);
+}
+
+.roll-button:hover :nth-child(2) {
+  transform: rotateX(-90deg);
+}

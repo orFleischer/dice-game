@@ -2,13 +2,13 @@ port module DiceGame exposing (..)
 
 import Browser
 import Html exposing (..)
-import Html.Attributes exposing (disabled, style)
+import Html.Attributes exposing (class, disabled, style)
 import Html.Events exposing (..)
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Random
 import Svg exposing (Svg, circle, rect, svg)
-import Svg.Attributes as Svg exposing (cx, cy, fill, height, r, rx, ry, stroke, strokeWidth, width, x, y)
+import Svg.Attributes as Svg exposing (cx, cy, fill, height, r, rx, ry, stroke, strokeWidth, visibility, width, x, y)
 import Time
 
 
@@ -30,7 +30,7 @@ main =
 
 
 configs =
-    { diceColors = { red = "#EB1124", white = "white" }
+    { diceColors = { red = "#EB1124", white = "#f5f5f5" }
     , animationFrameDelay = 100
     , throwsPerGame = 5
     , diceRollsPerGame = 10
@@ -193,8 +193,8 @@ subscriptions model =
 
 view : Model -> Html Msg
 view model =
-    div []
-        [ div [ style "float" "left" ]
+    div [ class "pure-g" ]
+        [ div [ class "pure-u-1-3" ]
             [ div []
                 [ h1 [] [ text (String.fromInt (faceValue model.dieFace1)) ]
                 , svg [] (dice 10 10 50 model.dieFace1)
@@ -203,10 +203,11 @@ view model =
                 [ h1 [] [ text (String.fromInt (faceValue model.dieFace2)) ]
                 , svg [] (dice 10 10 50 model.dieFace2)
                 ]
-            , button [ onClick Roll, disabled model.isRolling ] [ text "Roll" ]
+            , button [ onClick Roll, disabled model.isRolling ] [ div [ class "roll-button" ] [ div [] [ text "Roll" ], div [] [ text "Roll" ] ] ]
             , h1 [] [ renderWinLoss model ]
             ]
-        , div [] (h1 [] [ text ("Your Score is " ++ String.fromInt model.score) ] :: renderHiScores model.hiScores)
+        , div [ class "pure-u-1-3" ] [ h1 [] [ text ("Your Score is " ++ String.fromInt model.score) ] ]
+        , div [ class "pure-u-1-3" ] (renderHiScores model.hiScores)
         ]
 
 
@@ -267,7 +268,8 @@ dice upperLeftX upperLeftY edgeLength diceFace =
 diceDots : Float -> Float -> Float -> DiceFace -> List (Svg msg)
 diceDots x y edgeLength diceFace =
     let
-        diceRenderer = \f -> f x y edgeLength
+        diceRenderer =
+            \f -> f x y edgeLength
     in
     case diceFace of
         One ->
@@ -406,7 +408,10 @@ diceDot radius centerX centerY =
         ]
         []
 
+
+
 -- Encoders/Decoders
+
 
 hiScoresDecoder : Decode.Decoder (List HiScore)
 hiScoresDecoder =
