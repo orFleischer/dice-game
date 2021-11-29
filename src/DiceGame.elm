@@ -2,13 +2,13 @@ port module DiceGame exposing (..)
 
 import Browser
 import Html exposing (..)
-import Html.Attributes exposing (class, disabled, style)
+import Html.Attributes exposing (class, disabled)
 import Html.Events exposing (..)
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Random
 import Svg exposing (Svg, circle, rect, svg)
-import Svg.Attributes as Svg exposing (cx, cy, fill, height, r, rx, ry, stroke, strokeWidth, visibility, width, x, y)
+import Svg.Attributes as Svg exposing (cx, cy, fill, height, r, rx, ry, stroke, strokeWidth, width, x, y)
 import Time
 
 
@@ -34,6 +34,7 @@ configs =
     , animationFrameDelay = 100
     , throwsPerGame = 5
     , diceRollsPerGame = 10
+    , takeInitialsLength = 3
     }
 
 
@@ -123,7 +124,7 @@ update msg model =
         GotUserName maybeName ->
             let
                 effectiveName =
-                    Maybe.withDefault "hatul" maybeName
+                    Maybe.withDefault "hatul" maybeName |> strTakeN configs.takeInitialsLength
 
                 newHiScore =
                     HiScore model.score effectiveName
@@ -206,8 +207,8 @@ view model =
             , button [ onClick Roll, disabled model.isRolling ] [ div [ class "roll-button" ] [ div [] [ text "Roll" ], div [] [ text "Roll" ] ] ]
             , h1 [] [ renderWinLoss model ]
             ]
-        , div [ class "pure-u-1-3" ] [ h1 [] [ text ("Your Score is " ++ String.fromInt model.score) ] ]
-        , div [ class "pure-u-1-3" ] (renderHiScores model.hiScores)
+        , div [ class "pure-u-1-3 not-game-board" ] [ h1 [] [ text ("Your Score is " ++ String.fromInt model.score) ] ]
+        , div [ class "pure-u-1-3 not-game-board"] (renderHiScores model.hiScores)
         ]
 
 
@@ -436,6 +437,16 @@ encodeHiScore hiScore =
 faceScore : DiceFace -> Int
 faceScore diceFace =
     faceValue diceFace
+
+strTakeN : Int -> String -> String
+strTakeN takeN str =
+    let
+        strlen = String.length str
+    in
+    if strlen <= takeN then
+        str
+    else
+        String.dropRight (strlen - takeN) str
 
 
 faceValue : DiceFace -> Int
