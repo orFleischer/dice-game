@@ -7,6 +7,7 @@ import Html.Events exposing (..)
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Random
+import String exposing (repeat)
 import Svg exposing (Svg, circle, rect, svg)
 import Svg.Attributes as Svg exposing (cx, cy, fill, height, r, rx, ry, stroke, strokeWidth, width, x, y)
 import Time
@@ -35,6 +36,8 @@ configs =
     , throwsPerGame = 5
     , diceRollsPerGame = 10
     , takeInitialsLength = 3
+    , hiScoreLineLength = 30
+    , hiScoreSlots = 10
     }
 
 
@@ -134,7 +137,7 @@ update msg model =
                     (newHiScore :: model.hiScores)
                         |> List.sortBy .score
                         |> List.reverse
-                        |> List.take 2
+                        |> List.take configs.hiScoreSlots
 
                 _ =
                     Debug.log "encoded stuff" newHiScores
@@ -207,8 +210,8 @@ view model =
             , button [ onClick Roll, disabled model.isRolling ] [ div [ class "roll-button" ] [ div [] [ text "Roll" ], div [] [ text "Roll" ] ] ]
             , h1 [] [ renderWinLoss model ]
             ]
-        , div [ class "pure-u-1-3 not-game-board" ] [ h1 [] [ text ("Your Score is " ++ String.fromInt model.score) ] ]
-        , div [ class "pure-u-1-3 not-game-board"] (renderHiScores model.hiScores)
+        , div [ class "pure-u-1-3 not-game-board" ] [ h1 [] [ text ("Your Score is " ++ String.fromInt model.score) ], h1 [] [ text ("Your have " ++ String.fromInt model.throwsLeft ++ " throws left") ] ]
+        , div [ class "pure-u-1-3 not-game-board" ] (renderHiScores model.hiScores)
         ]
 
 
@@ -222,12 +225,22 @@ renderHiScores hiScores =
             let
                 renderedHiScores =
                     nonEmptyHiScores
-                        |> List.map (\{ score, name } -> name ++ "   " ++ String.fromInt score)
+                        |> List.map renderHiScoreLine
                         |> List.map (\scoreStr -> li [] [ text scoreStr ])
             in
-            [ h1 [] [ text "High Scores" ]
-            , ol [] renderedHiScores
-            ]
+            [ h1 [] [ text "High Scores", h4 [] [ ol [] renderedHiScores ] ] ]
+
+
+renderHiScoreLine : { score : Int, name : String } -> String
+renderHiScoreLine { score, name } =
+    let
+        scoreStr =
+            String.fromInt score
+
+        remainingLineLength =
+            configs.hiScoreLineLength - String.length name - String.length scoreStr
+    in
+    name ++ repeat remainingLineLength "." ++ scoreStr
 
 
 renderWinLoss : Model -> Html msg
@@ -438,13 +451,16 @@ faceScore : DiceFace -> Int
 faceScore diceFace =
     faceValue diceFace
 
+
 strTakeN : Int -> String -> String
 strTakeN takeN str =
     let
-        strlen = String.length str
+        strlen =
+            String.length str
     in
     if strlen <= takeN then
         str
+
     else
         String.dropRight (strlen - takeN) str
 
